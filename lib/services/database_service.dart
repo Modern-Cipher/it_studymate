@@ -8,6 +8,7 @@ import '../models/app_user.dart';
 import '../models/subject.dart';
 import '../models/task.dart';
 import '../utils/app_format.dart';
+import '../utils/recovery_code.dart';
 
 class AuthFailure implements Exception {
   const AuthFailure(this.message);
@@ -24,7 +25,7 @@ class DatabaseService {
   static final DatabaseService instance = DatabaseService._internal();
 
   static const String _dbName = 'it_studymate.db';
-  static const int _dbVersion = 2;
+  static const int _dbVersion = 3;
 
   Database? _database;
 
@@ -36,8 +37,8 @@ class DatabaseService {
     return opened;
   }
 
-  String _hash(String password, String salt) =>
-      sha256.convert(utf8.encode('$salt::$password')).toString();
+  String _hash(String value, String salt) =>
+      sha256.convert(utf8.encode('$salt::$value')).toString();
 
   int _asInt(Object? value) {
     if (value == null) return 0;
@@ -59,11 +60,22 @@ class DatabaseService {
         await _createSchema(db);
       },
       onUpgrade: (Database db, int oldVersion, int newVersion) async {
-        await db.execute('DROP TABLE IF EXISTS sessions');
-        await db.execute('DROP TABLE IF EXISTS tasks');
-        await db.execute('DROP TABLE IF EXISTS subjects');
-        await db.execute('DROP TABLE IF EXISTS users');
-        await _createSchema(db);
+        if (oldVersion < 2) {
+          await db.execute('DROP TABLE IF EXISTS sessions');
+          await db.execute('DROP TABLE IF EXISTS tasks');
+          await db.execute('DROP TABLE IF EXISTS subjects');
+          await db.execute('DROP TABLE IF EXISTS users');
+          await _createSchema(db);
+          return;
+        }
+        if (oldVersion < 3) {
+          await db.execute(
+            "ALTER TABLE users ADD COLUMN recovery_hash TEXT NOT NULL DEFAULT ''",
+          );
+          await db.execute(
+            "ALTER TABLE users ADD COLUMN recovery_salt TEXT NOT NULL DEFAULT ''",
+          );
+        }
       },
     );
   }
@@ -77,6 +89,8 @@ class DatabaseService {
         email TEXT NOT NULL UNIQUE,
         password_hash TEXT NOT NULL,
         salt TEXT NOT NULL,
+        recovery_hash TEXT NOT NULL DEFAULT '',
+        recovery_salt TEXT NOT NULL DEFAULT '',
         course TEXT NOT NULL,
         year_level INTEGER NOT NULL,
         section TEXT NOT NULL,
@@ -138,8 +152,9 @@ class DatabaseService {
     );
     if (rows.isEmpty) return null;
     final Map<String, Object?> row = rows.first;
-    final String salt = row['salt'] as String;
-    if (_hash(password, salt) != row['password_hash']) return null;
+    if (_hash(password, row['salt'] as String) != row['password_hash']) {
+      return null;
+    }
     return AppUser.fromMap(row);
   }
 
@@ -160,6 +175,7 @@ class DatabaseService {
     required String lastName,
     required String email,
     required String password,
+    required String recoveryCode,
     required String course,
     required int yearLevel,
     required String section,
@@ -176,12 +192,16 @@ class DatabaseService {
       throw const AuthFailure('This email is already registered.');
     }
     final String salt = DateTime.now().microsecondsSinceEpoch.toString();
+    final String recoverySalt =
+        '${DateTime.now().microsecondsSinceEpoch}rc';
     final int id = await db.insert('users', <String, Object?>{
       'first_name': firstName.trim(),
       'last_name': lastName.trim(),
       'email': normalized,
       'password_hash': _hash(password, salt),
       'salt': salt,
+      'recovery_hash': _hash(RecoveryCode.normalize(recoveryCode), recoverySalt),
+      'recovery_salt': recoverySalt,
       'course': course.trim(),
       'year_level': yearLevel,
       'section': section.trim(),
@@ -196,6 +216,84 @@ class DatabaseService {
       yearLevel: yearLevel,
       section: section.trim(),
     );
+  }
+
+  Future<bool> accountExists(String email) async {
+    final Database db = await database;
+    final List<Map<String, Object?>> rows = await db.query(
+      'users',
+      columns: <String>['id'],
+      where: 'LOWER(email) = ?',
+      whereArgs: <Object?>[email.trim().toLowerCase()],
+      limit: 1,
+    );
+    return rows.isNotEmpty;
+  }
+
+  Future<bool> hasRecoveryCode(String email) async {
+    final Database db = await database;
+    final List<Map<String, Object?>> rows = await db.query(
+      'users',
+      columns: <String>['recovery_hash'],
+      where: 'LOWER(email) = ?',
+      whereArgs: <Object?>[email.trim().toLowerCase()],
+      limit: 1,
+    );
+    if (rows.isEmpty) return false;
+    final String hash = (rows.first['recovery_hash'] as String?) ?? '';
+    return hash.isNotEmpty;
+  }
+
+  Future<bool> verifyRecoveryCode(String email, String code) async {
+    final Database db = await database;
+    final List<Map<String, Object?>> rows = await db.query(
+      'users',
+      columns: <String>['recovery_hash', 'recovery_salt'],
+      where: 'LOWER(email) = ?',
+      whereArgs: <Object?>[email.trim().toLowerCase()],
+      limit: 1,
+    );
+    if (rows.isEmpty) return false;
+    final String hash = (rows.first['recovery_hash'] as String?) ?? '';
+    final String salt = (rows.first['recovery_salt'] as String?) ?? '';
+    if (hash.isEmpty || salt.isEmpty) return false;
+    return _hash(RecoveryCode.normalize(code), salt) == hash;
+  }
+
+  Future<bool> verifyLegacyIdentity({
+    required String email,
+    required String firstName,
+    required String lastName,
+    required String section,
+  }) async {
+    final Database db = await database;
+    final List<Map<String, Object?>> rows = await db.query(
+      'users',
+      columns: <String>['first_name', 'last_name', 'section'],
+      where: 'LOWER(email) = ?',
+      whereArgs: <Object?>[email.trim().toLowerCase()],
+      limit: 1,
+    );
+    if (rows.isEmpty) return false;
+    final Map<String, Object?> row = rows.first;
+    return (row['first_name'] as String).trim().toLowerCase() ==
+            firstName.trim().toLowerCase() &&
+        (row['last_name'] as String).trim().toLowerCase() ==
+            lastName.trim().toLowerCase() &&
+        (row['section'] as String).trim().toLowerCase() ==
+            section.trim().toLowerCase();
+  }
+
+  Future<bool> updatePassword(String email, String newPassword) async {
+    final Database db = await database;
+    final String salt = DateTime.now().microsecondsSinceEpoch.toString();
+    final int updated = await db.update(
+      'users',
+      <String, Object?>{'password_hash': _hash(newPassword, salt), 'salt': salt},
+      where: 'LOWER(email) = ?',
+      whereArgs: <Object?>[email.trim().toLowerCase()],
+    );
+    return updated > 0;
   }
 
   Future<List<Subject>> subjectsFor(int userId) async {

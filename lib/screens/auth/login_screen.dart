@@ -107,8 +107,24 @@ class _LoginScreenState extends State<LoginScreen> {
                     return null;
                   },
                 ),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: () => context.go('/forgot'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      padding: EdgeInsets.zero,
+                      minimumSize: const Size(0, 36),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: const Text(
+                      'Forgot password?',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ),
                 if (_error != null) ...<Widget>[
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 4),
                   Row(
                     children: <Widget>[
                       const Icon(
@@ -129,7 +145,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ],
                   ),
                 ],
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
                 AppButton(label: 'Sign in', onPressed: _submit, loading: busy),
                 const SizedBox(height: 20),
                 Row(
