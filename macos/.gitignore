@@ -1,0 +1,16 @@
+# Flutter-related
+**/Flutter/ephemeral/
+**/Flutter/Flutter-Generated.xcconfig
+**/Flutter/flutter_export_environment.sh
+**/Flutter/.swift_pm.lock
+**/Flutter/ephemeral/Packages/
+**/Flutter/GeneratedPluginRegistrant.swift
+
+# Xcode
+**/xcuserdata/
+**/*.xcuserstate
+**/DerivedData/
+**/.generated/
+
+# General
+.DS_Store
