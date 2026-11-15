@@ -4,15 +4,17 @@ import 'package:provider/provider.dart';
 
 import '../models/app_user.dart';
 import '../state/auth_provider.dart';
+import '../state/resource_provider.dart';
 import '../state/subject_provider.dart';
 import '../state/task_provider.dart';
 import '../theme/app_colors.dart';
 import 'dashboard_screen.dart';
-import 'profile_screen.dart';
+import 'more_screen.dart';
+import 'resources/resource_form_sheet.dart';
+import 'resources/resources_screen.dart';
 import 'subjects_screen.dart';
 import 'tasks/task_form_sheet.dart';
 import 'tasks/tasks_screen.dart';
-import 'timer_screen.dart';
 
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key});
@@ -38,11 +40,26 @@ class _HomeShellState extends State<HomeShell> {
     }
     final SubjectProvider subjects = context.read<SubjectProvider>();
     final TaskProvider tasks = context.read<TaskProvider>();
+    final ResourceProvider resources = context.read<ResourceProvider>();
     await subjects.load(user.id);
     await tasks.load(user.id);
+    await resources.load(user.id);
   }
 
   void _openTasks() => setState(() => _index = 1);
+
+  void _openAdd() {
+    switch (_index) {
+      case 2:
+        showSubjectFormSheet(context);
+        return;
+      case 3:
+        showResourceFormSheet(context);
+        return;
+      default:
+        showTaskFormSheet(context);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -50,21 +67,15 @@ class _HomeShellState extends State<HomeShell> {
       DashboardScreen(onOpenTasks: _openTasks),
       const TasksScreen(),
       const SubjectsScreen(),
-      const TimerScreen(),
-      const ProfileScreen(),
+      const ResourcesScreen(),
+      const MoreScreen(),
     ];
     return Scaffold(
       backgroundColor: AppColors.bg,
       body: IndexedStack(index: _index, children: pages),
-      floatingActionButton: _index <= 2
+      floatingActionButton: _index <= 3
           ? FloatingActionButton(
-              onPressed: () {
-                if (_index == 2) {
-                  showSubjectFormSheet(context);
-                  return;
-                }
-                showTaskFormSheet(context);
-              },
+              onPressed: _openAdd,
               backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
               child: const Icon(Icons.add),
@@ -88,16 +99,16 @@ class _BottomNav extends StatelessWidget {
     Icons.space_dashboard_outlined,
     Icons.task_alt,
     Icons.menu_book_outlined,
-    Icons.timer_outlined,
-    Icons.person_outline,
+    Icons.ondemand_video_outlined,
+    Icons.more_horiz,
   ];
 
   static const List<String> _labels = <String>[
     'Home',
     'Tasks',
     'Subjects',
-    'Timer',
-    'Profile',
+    'Learn',
+    'More',
   ];
 
   @override

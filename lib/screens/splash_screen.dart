@@ -13,6 +13,8 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  static const Duration _minimumDisplay = Duration(milliseconds: 1500);
+
   @override
   void initState() {
     super.initState();
@@ -21,7 +23,10 @@ class _SplashScreenState extends State<SplashScreen> {
 
   Future<void> _start() async {
     final AuthProvider auth = context.read<AuthProvider>();
-    await auth.bootstrap();
+    await Future.wait(<Future<void>>[
+      auth.bootstrap(),
+      Future<void>.delayed(_minimumDisplay),
+    ]);
     if (!mounted) return;
     context.go(auth.isAuthenticated ? '/home' : '/login');
   }
@@ -37,47 +42,82 @@ class _SplashScreenState extends State<SplashScreen> {
             end: Alignment.bottomRight,
           ),
         ),
-        child: Center(
+        child: SafeArea(
           child: Column(
-            mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              Container(
-                width: 96,
-                height: 96,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.14),
-                  borderRadius: BorderRadius.circular(28),
-                ),
-                child: const Icon(
-                  Icons.school_outlined,
-                  size: 44,
-                  color: Colors.white,
+              Expanded(
+                child: Center(
+                  child: TweenAnimationBuilder<double>(
+                    tween: Tween<double>(begin: 0, end: 1),
+                    duration: const Duration(milliseconds: 650),
+                    curve: Curves.easeOutCubic,
+                    builder: (BuildContext context, double value, Widget? child) {
+                      return Opacity(
+                        opacity: value,
+                        child: Transform.scale(
+                          scale: 0.92 + (0.08 * value),
+                          child: child,
+                        ),
+                      );
+                    },
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[
+                        Container(
+                          width: 104,
+                          height: 104,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(30),
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: Image.asset(
+                            'assets/images/icon.png',
+                            fit: BoxFit.cover,
+                            errorBuilder:
+                                (
+                                  BuildContext context,
+                                  Object error,
+                                  StackTrace? stack,
+                                ) => const Icon(
+                                  Icons.school_outlined,
+                                  size: 48,
+                                  color: AppColors.primary,
+                                ),
+                          ),
+                        ),
+                        const SizedBox(height: 26),
+                        const Text(
+                          'IT StudyMate',
+                          style: TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                            letterSpacing: 0.2,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Plan. Review. Progress.',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.white.withValues(alpha: 0.82),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
-              const SizedBox(height: 24),
-              const Text(
-                'IT StudyMate',
-                style: TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Plan. Review. Progress.',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.white.withValues(alpha: 0.8),
-                ),
-              ),
-              const SizedBox(height: 40),
-              const SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.4,
-                  color: Colors.white,
+              const Padding(
+                padding: EdgeInsets.only(bottom: 40),
+                child: SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.2,
+                    color: Colors.white,
+                  ),
                 ),
               ),
             ],

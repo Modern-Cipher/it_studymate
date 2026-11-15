@@ -3,6 +3,7 @@ class AppUser {
     required this.id,
     required this.firstName,
     required this.lastName,
+    required this.username,
     required this.email,
     required this.course,
     required this.yearLevel,
@@ -12,6 +13,7 @@ class AppUser {
   final int id;
   final String firstName;
   final String lastName;
+  final String username;
   final String email;
   final String course;
   final int yearLevel;
@@ -21,6 +23,7 @@ class AppUser {
     id: map['id'] as int,
     firstName: map['first_name'] as String,
     lastName: map['last_name'] as String,
+    username: (map['username'] as String?) ?? '',
     email: map['email'] as String,
     course: map['course'] as String,
     yearLevel: map['year_level'] as int,
@@ -39,4 +42,8 @@ class AppUser {
   }
 
   String get programLabel => '$course · Year $yearLevel';
+
+  bool get hasUsername => username.isNotEmpty;
+
+  String get handle => hasUsername ? '@$username' : email;
 }

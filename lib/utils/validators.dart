@@ -5,6 +5,8 @@ class Validators {
 
   static final RegExp personName = RegExp(r"^[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ' .-]{1,39}$");
 
+  static final RegExp usernameRule = RegExp(r'^[A-Za-z][A-Za-z0-9._]{2,19}$');
+
   static final RegExp uppercase = RegExp(r'[A-Z]');
   static final RegExp lowercase = RegExp(r'[a-z]');
   static final RegExp digit = RegExp(r'[0-9]');
@@ -25,6 +27,27 @@ class Validators {
     final String text = (value ?? '').trim();
     if (text.isEmpty) return 'Email is required.';
     if (!email.hasMatch(text)) return 'Enter a valid email address.';
+    return null;
+  }
+
+  static String? optionalUsernameError(String? value) {
+    final String text = (value ?? '').trim();
+    if (text.isEmpty) return null;
+    if (!usernameRule.hasMatch(text)) {
+      return 'Username must be 3-20 characters, start with a letter, and use letters, numbers, dot, or underscore only.';
+    }
+    return null;
+  }
+
+  static bool looksLikeEmail(String value) => value.contains('@');
+
+  static String? identifierError(String? value) {
+    final String text = (value ?? '').trim();
+    if (text.isEmpty) return 'Enter your email or username.';
+    if (looksLikeEmail(text)) return emailError(text);
+    if (optionalUsernameError(text) != null) {
+      return 'Enter a valid email or username.';
+    }
     return null;
   }
 

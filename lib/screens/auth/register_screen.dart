@@ -19,6 +19,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final TextEditingController _firstName = TextEditingController();
   final TextEditingController _lastName = TextEditingController();
+  final TextEditingController _username = TextEditingController();
   final TextEditingController _email = TextEditingController();
   final TextEditingController _password = TextEditingController();
   final TextEditingController _confirmPassword = TextEditingController();
@@ -33,6 +34,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   void dispose() {
     _firstName.dispose();
     _lastName.dispose();
+    _username.dispose();
     _email.dispose();
     _password.dispose();
     _confirmPassword.dispose();
@@ -100,6 +102,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final String? failure = await auth.register(
       firstName: _firstName.text,
       lastName: _lastName.text,
+      username: _username.text,
       email: _email.text,
       password: _password.text,
       confirmPassword: _confirmPassword.text,
@@ -181,6 +184,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                     ),
                   ],
+                ),
+                const SizedBox(height: 16),
+                AppTextField(
+                  label: 'Username (optional)',
+                  controller: _username,
+                  hint: 'juan.dela',
+                  prefixIcon: Icons.person_outline,
+                  textInputAction: TextInputAction.next,
+                  validator: Validators.optionalUsernameError,
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'If you add a username, you can sign in with it instead of your email.',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    height: 1.4,
+                    color: AppColors.textMuted,
+                  ),
                 ),
                 const SizedBox(height: 16),
                 AppTextField(

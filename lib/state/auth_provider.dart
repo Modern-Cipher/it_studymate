@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../models/app_user.dart';
+import '../services/account_service.dart';
 import '../services/auth_service.dart';
 import '../services/database_service.dart';
 import '../utils/recovery_code.dart';
@@ -14,12 +15,17 @@ class ResetTarget {
 }
 
 class AuthProvider extends ChangeNotifier {
-  AuthProvider({DatabaseService? database, AuthService? session})
-    : _database = database ?? DatabaseService.instance,
-      _session = session ?? AuthService.instance;
+  AuthProvider({
+    DatabaseService? database,
+    AuthService? session,
+    AccountService? accounts,
+  }) : _database = database ?? DatabaseService.instance,
+       _session = session ?? AuthService.instance,
+       _accounts = accounts ?? AccountService.instance;
 
   final DatabaseService _database;
   final AuthService _session;
+  final AccountService _accounts;
 
   AppUser? _user;
   bool _booting = true;
@@ -45,15 +51,15 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<String?> login(String email, String password) async {
-    final String? emailError = Validators.emailError(email);
-    if (emailError != null) return emailError;
+  Future<String?> login(String identifier, String password) async {
+    final String? identifierFailure = Validators.identifierError(identifier);
+    if (identifierFailure != null) return identifierFailure;
     if (password.isEmpty) return 'Password is required.';
     _busy = true;
     notifyListeners();
     try {
-      final AppUser? user = await _database.authenticate(email, password);
-      if (user == null) return 'Invalid email or password.';
+      final AppUser? user = await _database.authenticate(identifier, password);
+      if (user == null) return 'Invalid email, username, or password.';
       _user = user;
       await _session.saveSession(user.id);
       return null;
@@ -68,6 +74,7 @@ class AuthProvider extends ChangeNotifier {
   Future<String?> register({
     required String firstName,
     required String lastName,
+    required String username,
     required String email,
     required String password,
     required String confirmPassword,
@@ -79,6 +86,8 @@ class AuthProvider extends ChangeNotifier {
     if (firstError != null) return firstError;
     final String? lastError = Validators.nameError(lastName, 'Last name');
     if (lastError != null) return lastError;
+    final String? usernameError = Validators.optionalUsernameError(username);
+    if (usernameError != null) return usernameError;
     final String? emailError = Validators.emailError(email);
     if (emailError != null) return emailError;
     final String? passwordError = Validators.passwordError(password);
@@ -93,6 +102,7 @@ class AuthProvider extends ChangeNotifier {
       final AppUser user = await _database.createUser(
         firstName: firstName.trim(),
         lastName: lastName.trim(),
+        username: username.trim(),
         email: email.trim(),
         password: password,
         recoveryCode: recoveryCode,
@@ -108,6 +118,118 @@ class AuthProvider extends ChangeNotifier {
       return failure.message;
     } catch (_) {
       return 'Could not create the account. Please try again.';
+    } finally {
+      _busy = false;
+      notifyListeners();
+    }
+  }
+
+  Future<String?> updateProfile({
+    required String firstName,
+    required String lastName,
+    required String username,
+    required String email,
+    required String course,
+    required int yearLevel,
+    required String section,
+    required String currentPassword,
+  }) async {
+    final AppUser? current = _user;
+    if (current == null) return 'You are not signed in.';
+    final Map<String, Object?> changes = <String, Object?>{};
+
+    final String firstNameText = firstName.trim();
+    if (firstNameText != current.firstName) {
+      final String? failure = Validators.nameError(firstNameText, 'First name');
+      if (failure != null) return failure;
+      changes['first_name'] = firstNameText;
+    }
+
+    final String lastNameText = lastName.trim();
+    if (lastNameText != current.lastName) {
+      final String? failure = Validators.nameError(lastNameText, 'Last name');
+      if (failure != null) return failure;
+      changes['last_name'] = lastNameText;
+    }
+
+    final String usernameText = username.trim().toLowerCase();
+    if (usernameText != current.username) {
+      final String? failure = Validators.optionalUsernameError(username);
+      if (failure != null) return failure;
+      changes['username'] = usernameText;
+    }
+
+    final String emailText = email.trim().toLowerCase();
+    if (emailText != current.email) {
+      final String? failure = Validators.emailError(email);
+      if (failure != null) return failure;
+      changes['email'] = emailText;
+    }
+
+    final String courseText = course.trim();
+    if (courseText != current.course) {
+      if (courseText.isEmpty) return 'Course cannot be empty.';
+      changes['course'] = courseText;
+    }
+
+    if (yearLevel != current.yearLevel) {
+      changes['year_level'] = yearLevel;
+    }
+
+    final String sectionText = section.trim();
+    if (sectionText != current.section) {
+      if (sectionText.isEmpty) return 'Section cannot be empty.';
+      changes['section'] = sectionText;
+    }
+
+    if (changes.isEmpty) return 'No changes to save.';
+    if (currentPassword.isEmpty) {
+      return 'Enter your current password to save changes.';
+    }
+
+    _busy = true;
+    notifyListeners();
+    try {
+      final String? failure = await _accounts.updateFields(
+        userId: current.id,
+        values: changes,
+        currentPassword: currentPassword,
+      );
+      if (failure != null) return failure;
+      _user = await _database.userById(current.id);
+      return null;
+    } catch (_) {
+      return 'Could not save the changes.';
+    } finally {
+      _busy = false;
+      notifyListeners();
+    }
+  }
+
+  Future<String?> changePassword({
+    required String currentPassword,
+    required String newPassword,
+    required String confirmPassword,
+  }) async {
+    final AppUser? current = _user;
+    if (current == null) return 'You are not signed in.';
+    if (currentPassword.isEmpty) return 'Enter your current password.';
+    final String? policy = Validators.passwordError(newPassword);
+    if (policy != null) return policy;
+    if (newPassword != confirmPassword) return 'Passwords do not match.';
+    if (newPassword == currentPassword) {
+      return 'Choose a password different from the current one.';
+    }
+    _busy = true;
+    notifyListeners();
+    try {
+      return await _accounts.changePassword(
+        userId: current.id,
+        currentPassword: currentPassword,
+        newPassword: newPassword,
+      );
+    } catch (_) {
+      return 'Could not update the password.';
     } finally {
       _busy = false;
       notifyListeners();
@@ -195,7 +317,10 @@ class AuthProvider extends ChangeNotifier {
     _busy = true;
     notifyListeners();
     try {
-      final bool updated = await _database.updatePassword(target.email, password);
+      final bool updated = await _database.updatePassword(
+        target.email,
+        password,
+      );
       if (!updated) return 'Password could not be updated.';
       _resetTarget = null;
       return null;

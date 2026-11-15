@@ -25,7 +25,7 @@ class DatabaseService {
   static final DatabaseService instance = DatabaseService._internal();
 
   static const String _dbName = 'it_studymate.db';
-  static const int _dbVersion = 3;
+  static const int _dbVersion = 4;
 
   Database? _database;
 
@@ -64,6 +64,7 @@ class DatabaseService {
           await db.execute('DROP TABLE IF EXISTS sessions');
           await db.execute('DROP TABLE IF EXISTS tasks');
           await db.execute('DROP TABLE IF EXISTS subjects');
+          await db.execute('DROP TABLE IF EXISTS resources');
           await db.execute('DROP TABLE IF EXISTS users');
           await _createSchema(db);
           return;
@@ -76,6 +77,14 @@ class DatabaseService {
             "ALTER TABLE users ADD COLUMN recovery_salt TEXT NOT NULL DEFAULT ''",
           );
         }
+        if (oldVersion < 4) {
+          await db.execute(
+            "ALTER TABLE users ADD COLUMN username TEXT NOT NULL DEFAULT ''",
+          );
+          await db.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users (LOWER(username)) WHERE username <> ''",
+          );
+        }
       },
     );
   }
@@ -86,6 +95,7 @@ class DatabaseService {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         first_name TEXT NOT NULL,
         last_name TEXT NOT NULL,
+        username TEXT NOT NULL DEFAULT '',
         email TEXT NOT NULL UNIQUE,
         password_hash TEXT NOT NULL,
         salt TEXT NOT NULL,
@@ -97,6 +107,9 @@ class DatabaseService {
         created_at TEXT NOT NULL
       )
     ''');
+    await db.execute(
+      "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users (LOWER(username)) WHERE username <> ''",
+    );
     await db.execute('''
       CREATE TABLE subjects (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -142,12 +155,13 @@ class DatabaseService {
     );
   }
 
-  Future<AppUser?> authenticate(String email, String password) async {
+  Future<AppUser?> authenticate(String identifier, String password) async {
     final Database db = await database;
+    final String value = identifier.trim().toLowerCase();
     final List<Map<String, Object?>> rows = await db.query(
       'users',
-      where: 'LOWER(email) = ?',
-      whereArgs: <Object?>[email.trim().toLowerCase()],
+      where: 'LOWER(email) = ? OR LOWER(username) = ?',
+      whereArgs: <Object?>[value, value],
       limit: 1,
     );
     if (rows.isEmpty) return null;
@@ -173,6 +187,7 @@ class DatabaseService {
   Future<AppUser> createUser({
     required String firstName,
     required String lastName,
+    required String username,
     required String email,
     required String password,
     required String recoveryCode,
@@ -181,23 +196,37 @@ class DatabaseService {
     required String section,
   }) async {
     final Database db = await database;
-    final String normalized = email.trim().toLowerCase();
+    final String normalizedEmail = email.trim().toLowerCase();
+    final String normalizedUsername = username.trim().toLowerCase();
+    if (normalizedUsername.isNotEmpty) {
+      final List<Map<String, Object?>> taken = await db.query(
+        'users',
+        columns: <String>['id'],
+        where: 'LOWER(username) = ?',
+        whereArgs: <Object?>[normalizedUsername],
+        limit: 1,
+      );
+      if (taken.isNotEmpty) {
+        throw const AuthFailure('This username is already taken.');
+      }
+    }
     final List<Map<String, Object?>> existing = await db.query(
       'users',
+      columns: <String>['id'],
       where: 'LOWER(email) = ?',
-      whereArgs: <Object?>[normalized],
+      whereArgs: <Object?>[normalizedEmail],
       limit: 1,
     );
     if (existing.isNotEmpty) {
       throw const AuthFailure('This email is already registered.');
     }
     final String salt = DateTime.now().microsecondsSinceEpoch.toString();
-    final String recoverySalt =
-        '${DateTime.now().microsecondsSinceEpoch}rc';
+    final String recoverySalt = '${DateTime.now().microsecondsSinceEpoch}rc';
     final int id = await db.insert('users', <String, Object?>{
       'first_name': firstName.trim(),
       'last_name': lastName.trim(),
-      'email': normalized,
+      'username': normalizedUsername,
+      'email': normalizedEmail,
       'password_hash': _hash(password, salt),
       'salt': salt,
       'recovery_hash': _hash(RecoveryCode.normalize(recoveryCode), recoverySalt),
@@ -211,7 +240,8 @@ class DatabaseService {
       id: id,
       firstName: firstName.trim(),
       lastName: lastName.trim(),
-      email: normalized,
+      username: normalizedUsername,
+      email: normalizedEmail,
       course: course.trim(),
       yearLevel: yearLevel,
       section: section.trim(),

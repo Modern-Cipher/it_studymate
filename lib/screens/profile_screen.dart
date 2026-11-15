@@ -1,4 +1,3 @@
-import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
 
@@ -7,8 +6,9 @@ import '../state/auth_provider.dart';
 import '../state/task_provider.dart';
 import '../theme/app_colors.dart';
 import '../utils/app_format.dart';
-import '../widgets/app_button.dart';
 import '../widgets/app_card.dart';
+import 'account/change_password_screen.dart';
+import 'account/edit_profile_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -64,6 +64,17 @@ class ProfileScreen extends StatelessWidget {
                           color: AppColors.textPrimary,
                         ),
                       ),
+                      if (user.hasUsername) ...<Widget>[
+                        const SizedBox(height: 2),
+                        Text(
+                          user.handle,
+                          style: const TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 4),
                       Text(
                         user.programLabel,
@@ -115,6 +126,14 @@ class ProfileScreen extends StatelessWidget {
           AppCard(
             child: Column(
               children: <Widget>[
+                if (user.hasUsername) ...<Widget>[
+                  _InfoRow(
+                    icon: Icons.person_outline,
+                    label: 'Username',
+                    value: '@${user.username}',
+                  ),
+                  const SizedBox(height: 14),
+                ],
                 _InfoRow(
                   icon: Icons.alternate_email,
                   label: 'Email',
@@ -141,6 +160,42 @@ class ProfileScreen extends StatelessWidget {
               ],
             ),
           ),
+          const SizedBox(height: 24),
+          const Padding(
+            padding: EdgeInsets.only(left: 4, bottom: 10),
+            child: Text(
+              'ACCOUNT SETTINGS',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.2,
+                color: AppColors.textMuted,
+              ),
+            ),
+          ),
+          _AccountTile(
+            icon: Icons.edit_outlined,
+            title: 'Edit profile',
+            subtitle: 'Name, username, email, course and section',
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (BuildContext routeContext) =>
+                    EditProfileScreen(user: user),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          _AccountTile(
+            icon: Icons.lock_outline,
+            title: 'Change password',
+            subtitle: 'Requires your current password',
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (BuildContext routeContext) =>
+                    const ChangePasswordScreen(),
+              ),
+            ),
+          ),
           const SizedBox(height: 16),
           AppCard(
             child: Row(
@@ -164,48 +219,72 @@ class ProfileScreen extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 24),
-          AppButton(
-            label: 'Sign out',
-            variant: AppButtonVariant.outline,
-            icon: Icons.logout,
-            onPressed: () => _confirmLogout(context),
-          ),
         ],
       ),
     );
   }
+}
 
-  Future<void> _confirmLogout(BuildContext context) async {
-    final bool? confirmed = await showDialog<bool>(
-      context: context,
-      builder: (BuildContext dialogContext) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(18),
-        ),
-        title: const Text('Sign out'),
-        content: const Text('Your saved data stays on this device.'),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            style: TextButton.styleFrom(
-              foregroundColor: AppColors.textSecondary,
+class _AccountTile extends StatelessWidget {
+  const _AccountTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      onTap: onTap,
+      child: Row(
+        children: <Widget>[
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(13),
             ),
-            child: const Text('Cancel'),
+            child: Icon(icon, size: 20, color: AppColors.primary),
           ),
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            style: TextButton.styleFrom(foregroundColor: AppColors.danger),
-            child: const Text('Sign out'),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Icon(
+            Icons.chevron_right,
+            size: 20,
+            color: AppColors.textMuted,
           ),
         ],
       ),
     );
-    if (confirmed != true || !context.mounted) return;
-    await context.read<AuthProvider>().logout();
-    if (!context.mounted) return;
-    context.go('/login');
   }
 }
 

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import 'router.dart';
 import 'state/auth_provider.dart';
+import 'state/resource_provider.dart';
 import 'state/subject_provider.dart';
 import 'state/task_provider.dart';
 import 'theme/app_theme.dart';
@@ -15,6 +16,7 @@ void main() {
         ChangeNotifierProvider<AuthProvider>(create: (_) => AuthProvider()),
         ChangeNotifierProvider<SubjectProvider>(create: (_) => SubjectProvider()),
         ChangeNotifierProvider<TaskProvider>(create: (_) => TaskProvider()),
+        ChangeNotifierProvider<ResourceProvider>(create: (_) => ResourceProvider()),
       ],
       child: const StudyMateApp(),
     ),

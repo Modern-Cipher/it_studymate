@@ -17,13 +17,13 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
-  final TextEditingController _email = TextEditingController();
+  final TextEditingController _identifier = TextEditingController();
   final TextEditingController _password = TextEditingController();
   String? _error;
 
   @override
   void dispose() {
-    _email.dispose();
+    _identifier.dispose();
     _password.dispose();
     super.dispose();
   }
@@ -32,7 +32,7 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     final AuthProvider auth = context.read<AuthProvider>();
     setState(() => _error = null);
-    final String? failure = await auth.login(_email.text, _password.text);
+    final String? failure = await auth.login(_identifier.text, _password.text);
     if (!mounted) return;
     if (failure != null) {
       setState(() => _error = failure);
@@ -78,18 +78,18 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  'Sign in with the email you registered.',
+                  'Sign in with your email or username.',
                   style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
                 ),
                 const SizedBox(height: 28),
                 AppTextField(
-                  label: 'Email',
-                  controller: _email,
-                  hint: 'you@school.edu',
+                  label: 'Email or username',
+                  controller: _identifier,
+                  hint: 'you@school.edu or juan.dela',
                   keyboardType: TextInputType.emailAddress,
-                  prefixIcon: Icons.alternate_email,
+                  prefixIcon: Icons.person_outline,
                   textInputAction: TextInputAction.next,
-                  validator: Validators.emailError,
+                  validator: Validators.identifierError,
                 ),
                 const SizedBox(height: 16),
                 AppTextField(
@@ -119,7 +119,10 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     child: const Text(
                       'Forgot password?',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ),
